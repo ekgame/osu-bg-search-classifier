@@ -6,6 +6,8 @@ from pathlib import Path
 import torch
 import torchvision.transforms.functional as TVF
 from flask import Flask, jsonify, request
+from datetime import datetime
+import time
 
 MODEL_REPO = "fancyfeast/joytag"
 THRESHOLD = 0.4
@@ -51,13 +53,15 @@ def predict(image: Image.Image):
 
   return tag_string
 
+def log(message):
+  print(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), message, flush=True)
 
-print("Downloading model...")
+log("Downloading model...")
 path = huggingface_hub.snapshot_download(MODEL_REPO)
-print("Loading model...")
+log("Loading model...")
 model = VisionModel.load_model(path)
 model.eval()
-print("Model loaded.")
+log("Model loaded.")
 
 with open(Path(path) / 'top_tags.txt', 'r') as f:
   top_tags = [line.strip() for line in f.readlines() if line.strip()]
@@ -74,8 +78,15 @@ def ping():
 @app.route('/classify', methods = ['POST'])
 def classify():
   image = Image.open(request.files['image'].stream)
+  start_time = time.time()
+  tags = predict(image)
+  end_time = time.time()
+  execution_time = (end_time - start_time) * 1000 
+  log("---")
+  log(tags)
+  log(f"Execution time: {execution_time:.2f}ms")
   return jsonify({
-    'tags': predict(image),
+    'tags': tags,
   })
 
 if __name__ == "__main__":
